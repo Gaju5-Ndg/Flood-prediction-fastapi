@@ -32,9 +32,10 @@ def floods_detector(data: DataPrediction):
     TopographyDrainage=data['TopographyDrainage']
     RiverManagement=data['RiverManagement']
     Deforestation=data['Deforestation']
-    water_level=data['water_level']
+    Urbanization=data['Urbanization']
+    ClimateChange=data['ClimateChange']
     
-    prediction = model.predict([[humidity,RiverManagement,Deforestation,water_level]])
+    prediction = model.predict([[TopographyDrainage,RiverManagement,Deforestation,Urbanization,ClimateChange]])
     
     return {"prediction": prediction.tolist()}
 

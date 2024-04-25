@@ -29,12 +29,12 @@ def get():
 #     return {"prediction": prediction}
 def floods_detector(data: DataPrediction):
     data = data.dict()
-    humidity=data['humidity']
-    temperature=data['temperature']
-    soil_moisture=data['soil_moisture']
+    TopographyDrainage=data['TopographyDrainage']
+    RiverManagement=data['RiverManagement']
+    Deforestation=data['Deforestation']
     water_level=data['water_level']
     
-    prediction = model.predict([[humidity,temperature,soil_moisture,water_level]])
+    prediction = model.predict([[humidity,RiverManagement,Deforestation,water_level]])
     
     return {"prediction": prediction.tolist()}
 

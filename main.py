@@ -1,20 +1,21 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-import pickle
+import joblib
 import uvicorn
 import numpy as np
 
 
-
 class DataPrediction(BaseModel):
-    humidity: float 
-    temperature: float 
-    soil_moisture: float 
-    water_level: float
+    TopographyDrainage: float
+    RiverManagement: float
+    Deforestation: float
+    Urbanization: float
+    ClimateChange: float
 
 app = FastAPI()
 
-model = pickle.load(open("linear_regression_model.pkl", "rb"))
+model = joblib.load('linear_regression_model.pkl')
+
 @app.get("/")
 def index():
     return {"welcome"}
@@ -24,20 +25,15 @@ def get():
     return {'Welcome To Floods detector'}
 
 @app.post("/floods_detector")
-# def floods_detector(data: DataPrediction):
-#     prediction = classifier.predict([[data.humidity, data.temperature, data.soil_moisture, data.water_level]])
-#     return {"prediction": prediction}
-def floods_detector(data: DataPrediction):
-    data = data.dict()
-    TopographyDrainage=data['TopographyDrainage']
-    RiverManagement=data['RiverManagement']
-    Deforestation=data['Deforestation']
-    Urbanization=data['Urbanization']
-    ClimateChange=data['ClimateChange']
-    
-    prediction = model.predict([[TopographyDrainage,RiverManagement,Deforestation,Urbanization,ClimateChange]])
-    
-    return {"prediction": prediction.tolist()}
+async def floods_detector(data: DataPrediction):
+    features = np.array([[data.TopographyDrainage, data.RiverManagement, data.Deforestation,
+                          data.Urbanization, data.ClimateChange]])
+    prediction = model.predict(features)
+    prediction_list = prediction.tolist()
+    return {"prediction": prediction_list}
 
 if __name__ == '__main__':
-    uvicorn.run("main:app", host="127.0.0.1", port=8888, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+
+# floods\Scripts\activate
+#uvicorn main:app --reload

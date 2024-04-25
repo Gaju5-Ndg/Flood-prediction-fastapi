@@ -1,7 +1,8 @@
 from pydantic import BaseModel
 
 class DataPrediction(BaseModel):
-    humidity: float 
-    temperature: float 
-    soil_moisture: float 
-    water_level: float
+    TopographyDrainage: float
+    RiverManagement: float
+    Deforestation: float
+    Urbanization: float
+    ClimateChange: float

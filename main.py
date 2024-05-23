@@ -1,54 +1,65 @@
-from fastapi import FastAPI, Query
-from pydantic import BaseModel
+from datetime import datetime
+from fastapi import FastAPI
 import joblib
 import uvicorn
-import numpy as np
-# from motor.motor_asyncio import AsyncIOMotorClient
-
-
-class DataPrediction(BaseModel):
-    TopographyDrainage: float
-    RiverManagement: float
-    Deforestation: float
-    Urbanization: float
-    ClimateChange: float
+import pandas as pd
+from config.db import conn
+from fastapi import FastAPI
+from models.floodsModel import DataFloods
+from schemas.predictionSchema import predictionEntity, predictionsEntity
 
 app = FastAPI()
 
-model = joblib.load('linear_regression_model.pkl')
+model = joblib.load('best_model.pkl')
 
-@app.get("/floods_data/")
-async def get_floods_data(
-    topography_drainage: float = Query(..., description="Topography and drainage value"),
-    river_management: float = Query(..., description="River management value"),
-    deforestation: float = Query(..., description="Deforestation value"),
-    urbanization: float = Query(..., description="Urbanization value"),
-    climate_change: float = Query(..., description="Climate change value"),
-):
-    # Prepare the input features
-    features = np.array([[topography_drainage, river_management, deforestation, urbanization, climate_change]])
-    prediction = model.predict(features)
-    prediction_list = prediction.tolist()
-    return {"prediction": prediction_list}
+feature_names = ['Water Level (cm)', 'Humidity (%)', 'Temperature (°C)', 'Soil Moisture (%)', 'Timestamp']
 
-# @app.get("/")
-# def index():
-#     return {"welcome"}
-
-# @app.get("/welcome")
-# def get():
-#     return {'Welcome To Floods detector'}
 
 @app.post("/floods_detector")
-async def floods_detector(data: DataPrediction):
-    features = np.array([[data.TopographyDrainage, data.RiverManagement, data.Deforestation,
-                          data.Urbanization, data.ClimateChange]])
-    prediction = model.predict(features)
-    prediction_list = prediction.tolist()       
-    return {"prediction": prediction_list}
+async def floods_detector(data: DataFloods):
+    dummy_timestamp = 0 
+    features = pd.DataFrame([[data.WaterLevel, data.Humidity, data.Temperature, data.SoilMoisture, dummy_timestamp]], columns=feature_names)
+    prediction = model.predict(features)[0]
+    prediction_prob = model.predict_proba(features)[0]
 
+    # Interpret the prediction
+    if prediction == 0:
+        status = "Normal"
+    elif prediction == 1:
+        status = "Flood"
+    elif prediction == 2:
+        status = "Drought"
+    else:
+        status = f"Unexpected class {prediction}"
+
+    result = {
+        "water_level": data.WaterLevel,
+        "soil_moisture": data.SoilMoisture,
+        "humidity": data.Humidity,
+        "temperature": data.Temperature,
+        "prediction": status,
+        "probability": {
+            "normal": prediction_prob[0] if len(prediction_prob) > 0 else None,
+            "flood": prediction_prob[1] if len(prediction_prob) > 1 else None,
+            "drought": prediction_prob[2] if len(prediction_prob) > 2 else None
+        },
+        "created_at": datetime.now()
+    }
+    inserted = conn.floods.predictions.insert_one(result)
+    inserted_id = str(inserted.inserted_id)
+    return {"message": "Data inserted successfully", "inserted_id": inserted_id}
+ 
+ 
+@app.get("/read_predictions")
+async def get_predictions():
+    if conn is None:
+        return { "error ": "Database connection not established"}
+    
+    return predictionsEntity(conn.floods.predictions.find())
+    
 if __name__ == '__main__':
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8001, reload=True)
+
 
 # floods\Scripts\activate
 #uvicorn main:app --reload

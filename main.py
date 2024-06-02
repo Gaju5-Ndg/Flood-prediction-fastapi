@@ -1,5 +1,5 @@
 from datetime import datetime
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 import joblib
 import uvicorn
 import pandas as pd
@@ -14,6 +14,15 @@ model = joblib.load('best_model.pkl')
 
 feature_names = ['Water Level (cm)', 'Humidity (%)', 'Temperature (°C)', 'Soil Moisture (%)', 'Timestamp']
 
+def serialize_result(result):
+    """
+    Helper function to serialize the MongoDB result by converting ObjectId to string.
+    """
+    if "_id" in result:
+        result["_id"] = str(result["_id"])
+    if "created_at" in result:
+        result["created_at"] = result["created_at"].isoformat()
+    return result
 
 @app.post("/floods_detector")
 async def floods_detector(data: DataFloods):
@@ -25,9 +34,9 @@ async def floods_detector(data: DataFloods):
     # Interpret the prediction
     if prediction == 0:
         status = "Normal"
-    elif prediction == 1:
-        status = "Flood"
     elif prediction == 2:
+        status = "Flood"
+    elif prediction == 1:
         status = "Drought"
     else:
         status = f"Unexpected class {prediction}"
@@ -47,9 +56,18 @@ async def floods_detector(data: DataFloods):
     }
     inserted = conn.floods.predictions.insert_one(result)
     inserted_id = str(inserted.inserted_id)
-    return {"message": "Data inserted successfully", "inserted_id": inserted_id}
+    inserted_result = conn.floods.predictions.find_one({"_id": inserted.inserted_id})
+    serialized_result = serialize_result(inserted_result)
+
+    if not inserted_result:
+        raise HTTPException(status_code=404, detail="Prediction not found")
+    return {
+        "message": "Data inserted successfully",
+        "inserted_id": inserted_id,
+        "result": serialized_result
+    }
  
- 
+
 @app.get("/read_predictions")
 async def get_predictions():
     if conn is None:
@@ -62,4 +80,4 @@ if __name__ == '__main__':
 
 
 # floods\Scripts\activate
-#uvicorn main:app --reload
+# uvicorn main:app --reload
